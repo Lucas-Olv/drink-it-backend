@@ -57,7 +57,7 @@ fastify.listen({host: host, port: port}), function(error, address) {
 
 //SCHEDULER
 function createReminderTask(userId) {
-  cron.schedule(createCronDateTime('*/10', '*', '*', '*', '*', '*'), async() => {
+  cron.schedule(createCronDateTime('*', '*/30', '*', '*', '*', '*'), async() => {
     let authUsers = db.collection('/authenticated-users').doc(userId);
     let userRef = await authUsers.get();
 
