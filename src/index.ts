@@ -5,6 +5,8 @@ const { initializeApp } = require("firebase-admin/app");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
 const admin = require("firebase-admin");
+const port = process.env.PORT || 3000;
+const host = ("RENDER" in process.env) ? `0.0.0.0` : `localhost`;
 
 
 //FIREBASE INIT
@@ -45,7 +47,7 @@ fastify.post("/scheduleReminder", (request, reply) => {
   }
 })
 
-fastify.listen({port: 3000}), function(error, address) {
+fastify.listen({host: host, port: port}), function(error, address) {
   if (error) {
     console.error(error);
     process.exit(1);
