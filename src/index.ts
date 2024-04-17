@@ -51,7 +51,7 @@ fastify.post("/createReminder", (request, reply) => {
   userHasTask ? userHasTask.stop() : console.log('No schedule found.');
 
   try {
-    const schedule = cron.schedule(createCronDateTime('*/2', '*', '*', '*', '*', '*'), async () => {
+    const schedule = cron.schedule(createCronDateTime('*', '*/30', '9-18', '*', '*', '*'), async () => {
       const authUsers = db.collection('/authenticated-users').doc(request.body.userUid);
       const userRef = await authUsers.get();
 
