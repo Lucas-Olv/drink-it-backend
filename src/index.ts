@@ -1,6 +1,6 @@
 require("dotenv").config();
 const Fastify = require('fastify');
-const cron = require ('node-cron');
+const cron = require('node-cron');
 const { initializeApp } = require("firebase-admin/app");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
@@ -28,26 +28,17 @@ fastify.addHook('preHandler', (req, res, done) => {
 
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "POST");
-  res.header("Access-Control-Allow-Headers",  "*");
+  res.header("Access-Control-Allow-Headers", "*");
 
   const isPreflight = /options/i.test(req.method);
   if (isPreflight) {
     return res.send();
   }
-      
+
   done();
 })
 
-fastify.post("/scheduleReminder", (request, reply) => {
-  try {
-    createReminderTask(request.body.userUid);
-    reply.send({result: 'ok'});
-  } catch (error) {
-    reply.send({error: error})
-  }
-})
-
-fastify.listen({host: host, port: port}), function(error, address) {
+fastify.listen({ host: host, port: port }), function (error, address) {
   if (error) {
     console.error(error);
     process.exit(1);
@@ -55,31 +46,45 @@ fastify.listen({host: host, port: port}), function(error, address) {
   console.log("Server running. ", address);
 };
 
-//SCHEDULER
-function createReminderTask(userId) {
-  cron.schedule(createCronDateTime('*', '*/30', '*', '*', '*', '*'), async() => {
-    let authUsers = db.collection('/authenticated-users').doc(userId);
-    let userRef = await authUsers.get();
+fastify.post("/createReminder", (request, reply) => {
+  const userHasTask = cron.getTasks().get(request.body.userUid);
+  userHasTask ? userHasTask.stop() : console.log('No schedule found.');
 
-    if (!userRef.exists) {
-      console.log('No such document!');
-    } else {
-      let userData = userRef.data();
-      let message = {
-        notification: {
-          title: 'Tá na hora de beber água!',
-          body: 'Vira um gole aí, gatinha!'
-        },
-        token: userData.firebaseMessagingToken
-      };
-      getMessaging().send(message).then((response) => {
-        console.log('Successfully sent message:', response);
-      }).catch((error) => {
-        console.log('Error sending message:', error);
-      });
-    }
-  })
-}
+  try {
+    const schedule = cron.schedule(createCronDateTime('*/2', '*', '*', '*', '*', '*'), async () => {
+      const authUsers = db.collection('/authenticated-users').doc(request.body.userUid);
+      const userRef = await authUsers.get();
+
+      const notificationTitle = "Tá na hora de beber água!";
+      const notificationBody = "Vira um gole aí, gatinha!";
+
+      if (!userRef.exists) {
+        reply.code(400);
+        reply.send({ error: "User is not registered" });
+        schedule.stop();
+      } else {
+        const userData = userRef.data();
+        const message = {
+          notification: {
+            title: notificationTitle,
+            body: notificationBody
+          },
+          token: userData.firebaseMessagingToken
+        };
+        getMessaging().send(message).then((response) => {
+          console.log('Successfully sent message:', response);
+        }).catch((error) => {
+          console.log('Error sending message:', error);
+        });
+      }
+    }, { name: request.body.userUid });
+    schedule.start();
+    reply.code(200);
+    reply.send({ result: 'Schedule registered with success' });
+  } catch (error) {
+    reply.send({ error: error })
+  }
+})
 
 function createCronDateTime(seconds, minutes, hour, dayOfTheMonth, month, dayOfTheWeek) {
   return seconds + " " + minutes + " " + hour + " " + dayOfTheMonth + " " + month + " " + dayOfTheWeek;
