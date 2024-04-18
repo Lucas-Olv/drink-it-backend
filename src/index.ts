@@ -51,7 +51,7 @@ fastify.post("/createReminder", (request, reply) => {
   userHasTask ? userHasTask.stop() : console.log('No schedule found.');
 
   try {
-    const schedule = cron.schedule(createCronDateTime('*', '*/30', '9-18', '*', '*', '*'), async () => {
+    cron.schedule(createCronDateTime('*', '*/30', '9-18', '*', '*', '*'), async () => {
       const authUsers = db.collection('/authenticated-users').doc(request.body.userUid);
       const userRef = await authUsers.get();
 
@@ -61,7 +61,7 @@ fastify.post("/createReminder", (request, reply) => {
       if (!userRef.exists) {
         reply.code(400);
         reply.send({ error: "User is not registered" });
-        schedule.stop();
+        cron.stop();
       } else {
         const userData = userRef.data();
         const message = {
@@ -78,7 +78,7 @@ fastify.post("/createReminder", (request, reply) => {
         });
       }
     }, { name: request.body.userUid });
-    schedule.start();
+    console.log("Schedule registered with success");
     reply.code(200);
     reply.send({ result: 'Schedule registered with success' });
   } catch (error) {
