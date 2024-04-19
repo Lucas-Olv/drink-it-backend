@@ -19,7 +19,7 @@ const db = getFirestore();
 
 //FASTIFY CONFIG
 const fastify = Fastify({
-  logger: true
+  logger: false
 })
 
 fastify.addHook('preHandler', (req, res, done) => {
