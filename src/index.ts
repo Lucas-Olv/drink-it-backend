@@ -1,7 +1,5 @@
 require("dotenv").config();
 const Fastify = require('fastify');
-const cron = require('node-cron');
-const { initializeApp } = require("firebase-admin/app");
 const { getMessaging } = require("firebase-admin/messaging");
 const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
 const admin = require("firebase-admin");
@@ -21,7 +19,7 @@ const db = getFirestore();
 
 //FASTIFY CONFIG
 const fastify = Fastify({
-  logger: false
+  logger: true
 })
 
 fastify.addHook('preHandler', (req, res, done) => {
@@ -46,46 +44,41 @@ fastify.listen({ host: host, port: port }), function (error, address) {
   console.log("Server running. ", address);
 };
 
-fastify.post("/createReminder", (request, reply) => {
-  const userHasTask = cron.getTasks().get(request.body.userUid);
-  userHasTask ? userHasTask.stop() : console.log('No schedule found.');
+fastify.get("/healthCheck", (request, reply) => {
+  reply.code(200);
+  reply.send({status: "ok"});
+})
 
+fastify.post("/createReminder", async (request, reply) => {
   try {
-    cron.schedule(createCronDateTime('*', '*/30', '9-18', '*', '*', '*'), async () => {
-      const authUsers = db.collection('/authenticated-users').doc(request.body.userUid);
+      const authUsers = db.collection('/authenticated-users');
       const userRef = await authUsers.get();
+      userRef.forEach(doc => {
+        let document = doc.data();
+        const notificationTitle = process.env.NOTIFICATION_TITLE;
+        const notificationBody = process.env.NOTIFICATION_BODY;
 
-      const notificationTitle = "Tá na hora de beber água!";
-      const notificationBody = "Vira um gole aí, gatinha!";
-
-      if (!userRef.exists) {
-        reply.code(400);
-        reply.send({ error: "User is not registered" });
-        cron.stop();
-      } else {
-        const userData = userRef.data();
-        const message = {
-          notification: {
-            title: notificationTitle,
-            body: notificationBody
-          },
-          token: userData.firebaseMessagingToken
-        };
-        getMessaging().send(message).then((response) => {
-          console.log('Successfully sent message:', response);
-        }).catch((error) => {
-          console.log('Error sending message:', error);
-        });
-      }
-    }, { name: request.body.userUid });
-    console.log("Schedule registered with success");
-    reply.code(200);
-    reply.send({ result: 'Schedule registered with success' });
+        if (!document) {
+          reply.code(400);
+          reply.send({ error: "User is not registered" });
+        } else {
+          const message = {
+            "notification": {
+              "title": notificationTitle,
+              "body": notificationBody
+            },
+            "token": document.firebaseMessagingToken
+          };
+          getMessaging().send(message).then((response) => {
+            console.log('Successfully sent message:', response);
+          }).catch((error) => {
+            console.log('Error sending message:', error);
+          });
+        }
+      })
+      reply.code(200);
+      reply.send({result: "Notification has been sent."})
   } catch (error) {
     reply.send({ error: error })
   }
 })
-
-function createCronDateTime(seconds, minutes, hour, dayOfTheMonth, month, dayOfTheWeek) {
-  return seconds + " " + minutes + " " + hour + " " + dayOfTheMonth + " " + month + " " + dayOfTheWeek;
-}
